@@ -4,6 +4,7 @@ from supabase import create_client
 import os
 from dotenv import load_dotenv
 from research_module import tavily
+from modules.marketplace_integration.dashboard_bridge import render_export_button
 
 # Configuration
 load_dotenv()
@@ -13,7 +14,7 @@ st.set_page_config(layout="wide", page_title="ICM Inventory Command Center")
 
 st.title("Inventory Command Center")
 
-tab1, tab2 = st.tabs(["Inventory", "Manual Review Queue"])
+tab1, tab2, tab3 = st.tabs(["Inventory", "Manual Review Queue", "Marketplace Export"])
 
 # --- TAB 1: Inventory ---
 with tab1:
@@ -73,9 +74,14 @@ with tab2:
                     if st.button(f"Commit {item['sku']} to Inventory", key=f"commit_btn_{item['sku']}"):
                         try:
                             supabase.table("items").update({
-                                "title": new_title, 
+                                "title": new_title,
                                 "status": "draft"
                             }).eq("sku", item['sku']).execute()
                             st.success(f"Item {item['sku']} updated! Please refresh to clear from queue.")
                         except Exception as e:
                             st.error(f"Commit failed: {e}")
+
+# --- TAB 3: Marketplace Export ---
+with tab3:
+    st.header("Marketplace Export")
+    render_export_button()
