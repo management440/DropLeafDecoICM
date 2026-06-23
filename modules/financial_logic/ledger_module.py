@@ -44,6 +44,18 @@ class LedgerSummary:
         return f"{self.margin * 100:.1f}%" if self.margin is not None else "N/A"
 
 
+def get_item_cost(sku: str) -> float:
+    client = get_supabase_client()
+    response = client.table("items").select("cost_price").eq("sku", sku).single().execute()
+    cost = response.data.get("cost_price")
+    if cost is None:
+        raise ValueError(
+            f"No cost_price recorded for SKU '{sku}'. "
+            "Set it in the items table before recording a sale."
+        )
+    return float(cost)
+
+
 def add_entry(sku: str, type: TransactionType, amount: float, description: str = "") -> LedgerEntry:
     client = get_supabase_client()
     row = {
