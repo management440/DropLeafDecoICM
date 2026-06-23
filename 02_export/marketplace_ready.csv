@@ -1,0 +1,4 @@
+id,sku,title,status,price,provenance,condition,image_url
+2,SKU-002,Silver Ring,available,85.5,Private Collector,Excellent,
+5,SKU-003,Silver Coin,available,50.0,Auction,Mint,
+1,SKU-001,Vintage Watch,available,200.0,Estate Sale,Mint,https://fjwxnjergodowhlvniib.supabase.co/storage/v1/object/public/assets/SKU-001.jpg
