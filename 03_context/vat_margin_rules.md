@@ -1,71 +1,63 @@
-# VAT Margin Scheme Rules — DropLeaf Deco
+# VAT Margin Scheme (Antiques) — ICM Sovereign Knowledge Base
 
-## What Is the VAT Margin Scheme?
+## Core Principle
 
-The VAT Margin Scheme allows dealers of eligible second-hand goods to account for VAT on the **margin** (the difference between purchase price and selling price) rather than on the full selling price. This significantly reduces the VAT liability compared to standard VAT accounting.
+VAT is due only on the **profit margin**, not the full selling price.
 
-Vintage and antique furniture qualifies as an eligible good under HMRC's scheme.
+---
 
-**Reference:** HMRC VAT Notice 718 — The VAT Margin Scheme and global accounting.
+## Formula
+
+```
+Selling Price   = Selling Price (inclusive of VAT)
+Purchase Price  = Purchase Price (exclusive of VAT)
+
+Margin          = Selling Price - Purchase Price
+VAT Due         = Margin * (1/6)    # Assuming 20% standard rate
+```
+
+---
+
+## Constraints
+
+- Items must be **eligible for the scheme** (e.g., antiques, second-hand furniture)
+- Purchase and sale records must be **strictly linked by SKU**
+- **Negative margins** (losses) result in **zero VAT liability**
+
+---
+
+## Ledger Implementation
+
+`transaction_processor.py` must look up the `purchase_price` from the `items` table before calculating tax on a `sale` type transaction.
+
+The VAT calculation must not be performed using the `amount` field alone — the cost basis must be retrieved from the item record to ensure the margin is computed correctly per-SKU.
+
+### Required flow for `process_sale()`
+
+```
+1. Receive: sku, sale_price
+2. Look up: purchase_price = items[sku].cost_price
+3. Calculate: margin = sale_price - purchase_price
+4. Calculate: vat_due = margin * (1/6)  if margin > 0 else 0
+5. Record:    sale transaction to ledger
+6. Return:    SaleResult with margin, vat_due, net_retained
+```
 
 ---
 
 ## Eligibility
 
-Items qualify for the margin scheme if:
+Items qualify if:
 
-- They are **second-hand goods** (previously owned and used)
-- They were purchased from a **private individual, unregistered business, or another margin scheme dealer**
-- The seller did **not** charge VAT on the sale (i.e., no VAT invoice was issued)
-- The item can be **re-used in its current state** or after repair
+- They are second-hand or antique goods (previously owned)
+- They were purchased without a VAT invoice (private seller, unregistered dealer, or margin scheme dealer)
+- They can be re-used in their current state or after repair
 
 Items that do **not** qualify:
 
-- Goods purchased with a standard VAT invoice (input VAT was charged)
+- Goods purchased with a standard VAT invoice
+- Items where input VAT was charged and reclaimed
 - Precious metals or investment gold
-- Items purchased from a VAT-registered seller who charged VAT
-
----
-
-## How VAT Is Calculated Under the Scheme
-
-VAT is calculated on the **gross margin** (VAT-inclusive), not the selling price.
-
-### Formula
-
-```
-Gross Margin  = Selling Price − Purchase Price
-VAT Amount    = Gross Margin × (VAT Rate / (100 + VAT Rate))
-             = Gross Margin / 6          (at 20% VAT rate)
-Net Margin    = Gross Margin − VAT Amount
-```
-
-### Example
-
-| | |
-|---|---|
-| Purchase price | £100.00 |
-| Selling price | £250.00 |
-| Gross margin | £150.00 |
-| VAT (÷ 6) | £25.00 |
-| Net margin (retained) | £125.00 |
-
-If margin is **zero or negative**, no VAT is due on that item. The loss cannot be offset against other items (under individual item accounting).
-
----
-
-## Integration with the Pricing Engine
-
-The `pricing_engine.py` module targets a **60% gross margin** by default. Under the margin scheme, the effective net margin after VAT is lower:
-
-| Target Gross Margin | VAT Deducted (÷6) | Net Margin Retained |
-|---|---|---|
-| 60% | ~10% of selling price | ~50% of selling price |
-| 50% | ~8.3% of selling price | ~41.7% of selling price |
-
-**Practical implication:** If the business is VAT-registered and operating under the margin scheme, the 60% target in `pricing_engine.py` should be treated as the **gross (VAT-inclusive) margin**. The actual retained margin is approximately 50%.
-
-For a 50% net retained target, the current `DEFAULT_TARGET_MARGIN = 0.60` setting is correct.
 
 ---
 
@@ -73,20 +65,19 @@ For a 50% net retained target, the current `DEFAULT_TARGET_MARGIN = 0.60` settin
 
 | | |
 |---|---|
-| Mandatory registration threshold | £90,000 taxable turnover (rolling 12 months) |
-| Voluntary registration | Below threshold — can still register voluntarily |
-| VAT rate on margin | 20% (standard rate) |
+| Mandatory registration | £90,000 taxable turnover (rolling 12 months) |
+| Voluntary registration | Available below threshold |
+| VAT rate on margin | 20% standard rate |
 
-**Note:** Turnover for threshold purposes = total **selling prices**, not margins.
+Turnover for threshold purposes = total **selling prices**, not margins.
 
 ---
 
-## Record-Keeping Requirements
+## Record-Keeping Requirements (HMRC VAT Notice 718)
 
-HMRC requires the following records for each item sold under the scheme:
+Per-item stock book must record:
 
-### Stock Book (per item)
-- Stock reference number
+- Stock reference / SKU
 - Date of purchase
 - Description of item
 - Name and address of seller
@@ -95,23 +86,11 @@ HMRC requires the following records for each item sold under the scheme:
 - Selling price
 - Margin and VAT due
 
-### Supporting Documents
-- Purchase receipts or invoices (even informal ones from private sellers)
-- Sales invoices — must **not** show VAT separately (margin scheme invoices must state: *"This invoice is issued under the VAT margin scheme and does not give the right to reclaim the VAT shown"*)
-- Records must be kept for **6 years**
+Sales invoices must **not** show VAT as a separate line. Required invoice statement:
 
----
+> *"This invoice is issued under the VAT margin scheme and does not give the right to reclaim the VAT shown."*
 
-## Global Accounting (Alternative Method)
-
-Instead of calculating VAT per item, HMRC permits **global accounting** for items purchased for under £500. Under this method:
-
-- Total purchases in the period are pooled
-- Total sales are pooled
-- VAT is calculated on the overall net margin for the period
-- Losses on individual items **can** offset gains
-
-This may be preferable if DropLeaf Deco deals in high volumes of lower-value pieces.
+Records must be retained for **6 years**.
 
 ---
 
@@ -119,9 +98,10 @@ This may be preferable if DropLeaf Deco deals in high volumes of lower-value pie
 
 | Rule | Detail |
 |---|---|
-| VAT on margin only | Never on full selling price |
-| No input VAT reclaim | Cannot reclaim VAT on purchases made under the scheme |
-| Negative margin | No VAT due; loss not transferable (individual method) |
-| Invoice format | Must not show VAT as a separate line |
-| Records | 6-year retention requirement |
+| VAT base | Margin only — never full selling price |
+| Cost basis | Must be linked to purchase record by SKU |
+| Negative margin | Zero VAT due; loss is not transferable |
+| No input VAT reclaim | Cannot reclaim VAT on eligible purchases |
+| Invoice format | VAT must not appear as a separate line |
+| Retention | 6 years |
 | Threshold | £90,000 rolling 12-month turnover |
