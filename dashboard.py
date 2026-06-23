@@ -43,7 +43,7 @@ with tab2:
     else:
         for item in unconfirmed:
             # Each expander uses a unique key based on the SKU
-            with st.expander(f"Review: {item['sku']}", expanded=True, key=f"expander_{item['sku']}"):
+            with st.expander(f"Review: {item['sku']}", expanded=True):
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write(f"**Current Status**: {item['status']}")
@@ -69,7 +69,7 @@ with tab2:
                                 st.warning("No clear results found.")
                             
                     # Commit Logic with unique keys
-                    new_title = st.text_input("Verified Title", value=item['title'], key=f"title_input_{item['sku']}")
+                    new_title = st.text_input(f"Verified Title for {item['sku']}", value=item['title'], key=f"title_input_{item['sku']}")
                     if st.button(f"Commit {item['sku']} to Inventory", key=f"commit_btn_{item['sku']}"):
                         try:
                             supabase.table("items").update({
